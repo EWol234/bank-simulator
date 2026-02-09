@@ -1,6 +1,6 @@
-"""Database tables and session helpers.
+"""Simulation tables and session helpers.
 
-Each SQLite file is an independent database stored under DATA_DIR.
+Each SQLite file is an independent simulation stored under DATA_DIR.
 Sessions are created fresh per-operation — no engine caching or
 connection pooling.  Simple and self-contained.
 """
@@ -34,62 +34,53 @@ class Base(DeclarativeBase):
     pass
 
 
+class SimulationMetadata(Base):
+    __tablename__ = "simulation_metadata"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    start_datetime = Column(DateTime, nullable=False)
+    end_datetime = Column(DateTime, nullable=False)
+
+    def __repr__(self) -> str:
+        return (
+            f"<SimulationMetadata id={self.id} "
+            f"start={self.start_datetime} end={self.end_datetime}>"
+        )
+
+
 class Account(Base):
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
-    balance = Column(Float, nullable=False, default=0.0)
     created_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
-    updated_at = Column(
-        DateTime,
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
 
-    sent_transactions = relationship(
-        "Transaction",
-        foreign_keys="Transaction.from_account_id",
-        back_populates="from_account",
-    )
-    received_transactions = relationship(
-        "Transaction",
-        foreign_keys="Transaction.to_account_id",
-        back_populates="to_account",
+    balance_entries = relationship(
+        "BalanceEntry", back_populates="account", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
-        return f"<Account id={self.id} name={self.name!r} balance={self.balance}>"
+        return f"<Account id={self.id} name={self.name!r}>"
 
 
-class Transaction(Base):
-    __tablename__ = "transactions"
+class BalanceEntry(Base):
+    __tablename__ = "balance_entries"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    from_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
-    to_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     amount = Column(Float, nullable=False)
+    currency = Column(String(16), nullable=False)
     description = Column(Text, nullable=True)
-    created_at = Column(
-        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
-    )
+    effective_time = Column(DateTime, nullable=False)
 
-    from_account = relationship(
-        "Account", foreign_keys=[from_account_id], back_populates="sent_transactions"
-    )
-    to_account = relationship(
-        "Account",
-        foreign_keys=[to_account_id],
-        back_populates="received_transactions",
-    )
+    account = relationship("Account", back_populates="balance_entries")
 
     def __repr__(self) -> str:
         return (
-            f"<Transaction id={self.id} amount={self.amount} "
-            f"from={self.from_account_id} to={self.to_account_id}>"
+            f"<BalanceEntry id={self.id} account={self.account_id} "
+            f"amount={self.amount} currency={self.currency!r}>"
         )
 
 
@@ -98,21 +89,21 @@ class Transaction(Base):
 # ------------------------------------------------------------------
 
 
-def _db_path(db_name: str) -> str:
-    return os.path.join(DATA_DIR, f"{db_name}.db")
+def _sim_path(sim_name: str) -> str:
+    return os.path.join(DATA_DIR, f"{sim_name}.db")
 
 
-def _make_engine(db_name: str):
+def _make_engine(sim_name: str):
     return create_engine(
-        f"sqlite:///{_db_path(db_name)}",
+        f"sqlite:///{_sim_path(sim_name)}",
         connect_args={"check_same_thread": False},
     )
 
 
 @contextmanager
-def get_session(db_name: str):
+def get_session(sim_name: str):
     """Create a throwaway engine + session, yield it, then tear everything down."""
-    engine = _make_engine(db_name)
+    engine = _make_engine(sim_name)
     session: Session = sessionmaker(bind=engine)()
     try:
         yield session
@@ -125,19 +116,19 @@ def get_session(db_name: str):
         engine.dispose()
 
 
-def create_database(db_name: str) -> None:
+def create_simulation(sim_name: str) -> None:
     """Create a new SQLite file with all tables."""
-    engine = _make_engine(db_name)
+    engine = _make_engine(sim_name)
     Base.metadata.create_all(engine)
     engine.dispose()
 
 
-def database_exists(db_name: str) -> bool:
-    return os.path.isfile(_db_path(db_name))
+def simulation_exists(sim_name: str) -> bool:
+    return os.path.isfile(_sim_path(sim_name))
 
 
-def list_databases() -> list[str]:
-    """Return sorted database names (without the .db extension)."""
+def list_simulations() -> list[str]:
+    """Return sorted simulation names (without the .db extension)."""
     return sorted(
         f[:-3]
         for f in os.listdir(DATA_DIR)
@@ -145,7 +136,7 @@ def list_databases() -> list[str]:
     )
 
 
-def delete_database(db_name: str) -> None:
-    path = _db_path(db_name)
+def delete_simulation(sim_name: str) -> None:
+    path = _sim_path(sim_name)
     if os.path.isfile(path):
         os.remove(path)
