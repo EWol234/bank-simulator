@@ -67,6 +67,17 @@ export function listActivity(simName) {
   return request(`${BASE}/${simName}/activity`);
 }
 
+export function listFundingRules(simName) {
+  return request(`${BASE}/${simName}/funding-rules`);
+}
+
+export function createFundingRule(simName, rule) {
+  return request(`${BASE}/${simName}/funding-rules`, {
+    method: 'POST',
+    body: JSON.stringify(rule),
+  });
+}
+
 export function listEntries(simName, accountId) {
   return request(`${BASE}/${simName}/accounts/${accountId}/entries`);
 }

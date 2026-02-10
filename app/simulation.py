@@ -1,10 +1,10 @@
 """Simulation engine: propagators and runner."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import NamedTuple
 from abc import ABC, abstractmethod
 
-from app.database import BalanceEntry, get_balance
+from app.database import FundingRule, BalanceEntry, get_balance, get_balance_at_timestamp
 
 
 class ListeningPoint(NamedTuple):
@@ -48,7 +48,8 @@ class ManualEntry(Propagator):
 
 
 class Topup(Propagator):
-    def __init__(self, target_account_id, source_account_id, timestamp, currency, threshold, target):
+    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency, threshold, target):
+        self.rule_id = rule_id
         self.target_account_id = target_account_id
         self.source_account_id = source_account_id
         self.currency = currency
@@ -57,42 +58,54 @@ class Topup(Propagator):
         self.target = target
         self.description = f"{source_account_id} -> {target_account_id} Topup"
 
+        self.funding_timestamp = timestamp + timedelta(minutes=30) # Hard-coding 30 mins for wires to land
+
     def listening_points(self):
         return [ListeningPoint(account_id=self.target_account_id, timestamp=self.timestamp)]
 
     def propagate(self, session):
-        target_balance = get_balance(session, self.target_account_id, self.timestamp, self.currency)
-        prior_topup_amount = get_balance(session, self.target_account_id, self.timestamp, self.currency, self.description)
-        new_topup_amount = 0
-        if target_balance < threshold:
-            new_topup_amount = threshold - target_balance
-        if target_balance > threshold and prior_topup_amount > 0:
-            new_topup_amount = -min(prior_topup_amount, target_balance - threshold)
+        target_account_balance = get_balance(session, self.target_account_id, self.timestamp, self.currency)
+        prior_topup_amount = get_balance_at_timestamp(session, self.target_account_id, self.funding_timestamp, self.currency, rule_id=self.rule_id)
 
+        balance_diff = 0
+        if target_account_balance > self.threshold:
+            balance_diff = -min(prior_topup_amount, target_account_balance - self.threshold)
+        elif target_account_balance < self.threshold:
+            balance_diff = self.threshold - target_account_balance - prior_topup_amount
+
+        if balance_diff == 0:
+            return []
+
+        print(f"Target balance: {target_account_balance}, prior topup: {prior_topup_amount}, diff: {balance_diff}")
 
         source_balance_entry = BalanceEntry(
             account_id=self.source_account_id,
-            amount=-new_topup_amount,
+            amount=-balance_diff,
             currency=self.currency,
             description=self.description,
             effective_time=self.timestamp,
+            rule_id=self.rule_id,
         )
         target_balance_entry = BalanceEntry(
-            account_id=self.source_account_id,
-            amount=new_topup_amount,
+            account_id=self.target_account_id,
+            amount=balance_diff,
             currency=self.currency,
             description=self.description,
-            effective_time=self.timestamp,
+            effective_time=self.funding_timestamp,
+            rule_id=self.rule_id,
         )
-        
+
         session.add(source_balance_entry)
         session.add(target_balance_entry)
         session.flush()
 
+        return [source_balance_entry, target_balance_entry]
+
 
 class BackupAccount(Topup):
-    def __init__(self, target_account_id, source_account_id, timestamp, currency):
+    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency):
         super().__init__(
+            rule_id,
             target_account_id,
             source_account_id,
             timestamp,
@@ -103,11 +116,32 @@ class BackupAccount(Topup):
 
 
 class SimulationRunner:
-    def __init__(self, start_datetime, end_datetime):
+    def __init__(self, start_datetime, end_datetime, session):
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
         self.processing_queue = []
         self.listeners = dict()
+
+        rules = session.query(FundingRule).all()
+        current_date = start_datetime.date()
+        end_date = end_datetime.date()
+
+        while current_date <= end_date:
+            for rule in rules:
+                t = datetime.strptime(rule.time_of_day, "%H:%M:%S").time()
+                timestamp = datetime.combine(current_date, t)
+                if start_datetime <= timestamp <= end_datetime:
+                    propagator = BackupAccount(
+                        target_account_id=rule.target_account_id,
+                        source_account_id=rule.source_account_id,
+                        timestamp=timestamp,
+                        currency=rule.currency,
+                        rule_id=rule.id,
+                    )
+                    self.add_propagator(propagator)
+
+            current_date += timedelta(days=1)
+
 
     def add_propagator(self, propagator):
         for listening_point in propagator.listening_points():
@@ -125,7 +159,8 @@ class SimulationRunner:
             for new_entry in new_entries:
                 account_listeners = self.listeners.get(new_entry.account_id, [])
                 for timestamp, listener in account_listeners:
-                    if new_entry.effective_time >= timestamp:
+                    if new_entry.effective_time <= timestamp:
                         self.processing_queue.append(listener)
 
         return None
+

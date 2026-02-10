@@ -93,13 +93,27 @@ export default function ActivityTimeline({ entries }) {
           <div key={dateKey} className="activity-day">
             <h3 className="day-header">{displayDate}</h3>
             {sortedAccounts.map(([accountId, { name, entries: acctEntries }]) => {
-              const rows = acctEntries.map((entry) => {
+              // Consolidate entries with same timestamp+description+currency
+              const consolidated = [];
+              const groupMap = new Map();
+              for (const entry of acctEntries) {
+                const key = `${entry.effective_time}|${entry.description}|${entry.currency}`;
+                if (!groupMap.has(key)) {
+                  groupMap.set(key, { ...entry, amount: 0 });
+                  consolidated.push(groupMap.get(key));
+                }
+                groupMap.get(key).amount += entry.amount;
+              }
+              const filtered = consolidated.filter(e => Math.abs(e.amount) > 1e-9);
+
+              const rows = filtered.map((entry) => {
                 const prev = runningBalances.get(accountId) || 0;
                 const next = prev + entry.amount;
                 runningBalances.set(accountId, next);
                 return { ...entry, runningTotal: next };
               });
-              eodBalances.push({ accountId, name, balance: runningBalances.get(accountId) });
+              eodBalances.push({ accountId, name, balance: runningBalances.get(accountId) || 0 });
+              if (rows.length === 0) return null;
               return (
                 <div key={accountId} className="activity-account">
                   <h4>{name}</h4>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getMetadata, updateMetadata, listAccounts, createAccount, deleteAccount, listActivity } from '../api';
+import { getMetadata, updateMetadata, listAccounts, createAccount, deleteAccount, listActivity, listFundingRules, createFundingRule } from '../api';
 import AccountForm from '../components/AccountForm';
+import FundingForm from '../components/FundingForm';
 import ActivityTimeline from '../components/ActivityTimeline';
 
 export default function SimulationDetail() {
@@ -10,6 +11,7 @@ export default function SimulationDetail() {
   const [endDate, setEndDate] = useState('');
   const [accounts, setAccounts] = useState([]);
   const [activity, setActivity] = useState([]);
+  const [rules, setRules] = useState([]);
   const [error, setError] = useState(null);
 
   async function loadMetadata() {
@@ -40,10 +42,20 @@ export default function SimulationDetail() {
     }
   }
 
+  async function loadRules() {
+    try {
+      const data = await listFundingRules(simName);
+      setRules(data);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   useEffect(() => {
     loadMetadata();
     loadAccounts();
     loadActivity();
+    loadRules();
   }, [simName]);
 
   async function handleMetadataSave(e) {
@@ -71,6 +83,17 @@ export default function SimulationDetail() {
     try {
       await deleteAccount(simName, id);
       await loadAccounts();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleCreateRule(rule) {
+    setError(null);
+    try {
+      await createFundingRule(simName, rule);
+      await loadRules();
+      await loadActivity();
     } catch (e) {
       setError(e.message);
     }
@@ -111,6 +134,37 @@ export default function SimulationDetail() {
           ))}
           {accounts.length === 0 && <li>No accounts yet.</li>}
         </ul>
+      </section>
+
+      <section>
+        <h2>Backup Funding Rules</h2>
+        {accounts.length >= 2 ? (
+          <FundingForm accounts={accounts} onSubmit={handleCreateRule} />
+        ) : (
+          <p>Create at least 2 accounts to add backup funding rules.</p>
+        )}
+        {rules.length > 0 && (
+          <table>
+            <thead>
+              <tr>
+                <th>Target Account</th>
+                <th>Backup Account</th>
+                <th>Time of Day (ET)</th>
+                <th>Currency</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rules.map((rule) => (
+                <tr key={rule.id}>
+                  <td>{accounts.find((a) => a.id === rule.target_account_id)?.name || rule.target_account_id}</td>
+                  <td>{accounts.find((a) => a.id === rule.source_account_id)?.name || rule.source_account_id}</td>
+                  <td>{rule.time_of_day}</td>
+                  <td>{rule.currency}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
 
       {activity.length > 0 && (

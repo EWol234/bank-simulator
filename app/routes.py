@@ -7,10 +7,12 @@ from pydantic import BaseModel, ConfigDict
 
 from app.database import (
     Account,
+    FundingRule,
     BalanceEntry,
     SimulationMetadata,
     create_simulation,
     delete_simulation,
+    ensure_tables,
     get_session,
     list_simulations,
     simulation_exists,
@@ -51,6 +53,23 @@ class AccountOut(BaseModel):
 class MetadataUpdate(BaseModel):
     start_date: str | None = None
     end_date: str | None = None
+
+
+class FundingRuleCreate(BaseModel):
+    target_account_id: int
+    source_account_id: int
+    time_of_day: str
+    currency: str = "USD"
+
+
+class FundingRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    target_account_id: int
+    source_account_id: int
+    time_of_day: str
+    currency: str
 
 
 class BalanceEntryCreate(BaseModel):
@@ -229,6 +248,64 @@ def delete_account(sim_name: str, account_id: int):
 
 
 # ------------------------------------------------------------------
+# Funding rules
+# ------------------------------------------------------------------
+
+
+@bp.route("/simulations/<sim_name>/funding-rules", methods=["GET"])
+def list_funding_rules(sim_name: str):
+    err = _ensure_sim(sim_name)
+    if err:
+        return err
+    ensure_tables(sim_name)
+    with get_session(sim_name) as session:
+        rows = session.query(FundingRule).order_by(FundingRule.id).all()
+        return jsonify([FundingRuleOut.model_validate(r).model_dump(mode="json") for r in rows])
+
+
+@bp.route("/simulations/<sim_name>/funding-rules", methods=["POST"])
+def create_funding_rule(sim_name: str):
+    err = _ensure_sim(sim_name)
+    if err:
+        return err
+    body = FundingRuleCreate.model_validate(request.get_json())
+
+    # Validate time format
+    try:
+        datetime.strptime(body.time_of_day, "%H:%M:%S")
+    except ValueError:
+        return jsonify({"error": "time_of_day must be in HH:MM:SS format"}), 422
+
+    if body.target_account_id == body.source_account_id:
+        return jsonify({"error": "Target and source accounts must be different"}), 422
+
+    ensure_tables(sim_name)
+    with get_session(sim_name) as session:
+        # Validate accounts exist
+        if not session.get(Account, body.target_account_id):
+            return jsonify({"error": "Target account not found"}), 404
+        if not session.get(Account, body.source_account_id):
+            return jsonify({"error": "Source account not found"}), 404
+
+        rule = FundingRule(
+            target_account_id=body.target_account_id,
+            source_account_id=body.source_account_id,
+            time_of_day=body.time_of_day,
+            currency=body.currency,
+        )
+        session.add(rule)
+        session.flush()
+
+        # Run simulation with all backup funding rules
+        meta = session.query(SimulationMetadata).first()
+        if meta:
+            runner = SimulationRunner(meta.start_datetime, meta.end_datetime, session)
+            runner.simulate(session)
+
+        return jsonify(FundingRuleOut.model_validate(rule).model_dump(mode="json")), 201
+
+
+# ------------------------------------------------------------------
 # Balance entries
 # ------------------------------------------------------------------
 
@@ -301,7 +378,7 @@ def create_entry(sim_name: str, account_id: int):
             description=body.description or "Manual entry",
         )
 
-        runner = SimulationRunner(start_dt, end_dt)
+        runner = SimulationRunner(start_dt, end_dt, session)
         runner.add_propagator(propagator)
         runner.simulate(session)
 

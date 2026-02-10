@@ -74,6 +74,7 @@ class BalanceEntry(Base):
     currency = Column(String(16), nullable=False)
     description = Column(Text, nullable=True)
     effective_time = Column(DateTime, nullable=False)
+    rule_id = Column(Integer, ForeignKey("funding_rules.id"), nullable=True)
 
     account = relationship("Account", back_populates="balance_entries")
 
@@ -84,7 +85,27 @@ class BalanceEntry(Base):
         )
 
 
-def get_balance(session, account_id, timestamp, currency, description=None):
+class FundingRule(Base):
+    __tablename__ = "funding_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    target_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    source_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    time_of_day = Column(String(8), nullable=False)  # "HH:MM:SS" in ET
+    currency = Column(String(16), nullable=False)
+
+    target_account = relationship("Account", foreign_keys=[target_account_id])
+    source_account = relationship("Account", foreign_keys=[source_account_id])
+
+    def __repr__(self) -> str:
+        return (
+            f"<FundingRule id={self.id} "
+            f"target={self.target_account_id} source={self.source_account_id} "
+            f"time={self.time_of_day!r}>"
+        )
+
+
+def get_balance(session, account_id, timestamp, currency, rule_id=None):
     """Return the sum of all balance entries for an account/currency at or before a timestamp."""
     from sqlalchemy import func
     filters = [
@@ -92,8 +113,22 @@ def get_balance(session, account_id, timestamp, currency, description=None):
         BalanceEntry.currency == currency,
         BalanceEntry.effective_time <= timestamp,
     ]
-    if description is not None:
-        filters.append(BalanceEntry.description == description)
+    if rule_id is not None:
+        filters.append(BalanceEntry.rule_id == rule_id)
+
+    result = session.query(func.coalesce(func.sum(BalanceEntry.amount), 0.0)).filter(*filters).scalar()
+    return result
+
+def get_balance_at_timestamp(session, account_id, timestamp, currency, rule_id=None):
+    """Return the sum of all balance entries for an account/currency at or before a timestamp."""
+    from sqlalchemy import func
+    filters = [
+        BalanceEntry.account_id == account_id,
+        BalanceEntry.currency == currency,
+        BalanceEntry.effective_time == timestamp,
+    ]
+    if rule_id is not None:
+        filters.append(BalanceEntry.rule_id == rule_id)
 
     result = session.query(func.coalesce(func.sum(BalanceEntry.amount), 0.0)).filter(*filters).scalar()
     return result
@@ -163,6 +198,13 @@ def list_simulations() -> list[str]:
         for f in os.listdir(DATA_DIR)
         if f.endswith(".db") and os.path.isfile(os.path.join(DATA_DIR, f))
     )
+
+
+def ensure_tables(sim_name: str) -> None:
+    """Ensure all ORM tables exist in the given simulation DB (idempotent)."""
+    engine = _make_engine(sim_name)
+    Base.metadata.create_all(engine)
+    engine.dispose()
 
 
 def delete_simulation(sim_name: str) -> None:
