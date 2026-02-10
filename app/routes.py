@@ -76,6 +76,7 @@ class FundingRuleOut(BaseModel):
     currency: str
     threshold: float
     target_amount: float
+    description: str
 
 
 class BalanceEntryCreate(BaseModel):
@@ -301,10 +302,15 @@ def create_funding_rule(sim_name: str):
     ensure_tables(sim_name)
     with get_session(sim_name) as session:
         # Validate accounts exist
-        if not session.get(Account, body.target_account_id):
+        target_acct = session.get(Account, body.target_account_id)
+        if not target_acct:
             return jsonify({"error": "Target account not found"}), 404
-        if not session.get(Account, body.source_account_id):
+        source_acct = session.get(Account, body.source_account_id)
+        if not source_acct:
             return jsonify({"error": "Source account not found"}), 404
+
+        type_label = {"TOPUP": "Topup", "SWEEP_OUT": "Sweep Out", "BACKUP_FUNDING": "Backup Funding"}[body.rule_type]
+        description = f"{source_acct.name} -> {target_acct.name} {type_label}"
 
         rule = FundingRule(
             rule_type=body.rule_type,
@@ -314,6 +320,7 @@ def create_funding_rule(sim_name: str):
             currency=body.currency,
             threshold=body.threshold,
             target_amount=body.target_amount,
+            description=description,
         )
         session.add(rule)
         session.flush()
@@ -479,6 +486,8 @@ def seed_demo_data(sim_name: str):
         session.flush()
 
         # Funding rules
+        type_labels = {"TOPUP": "Topup", "SWEEP_OUT": "Sweep Out", "BACKUP_FUNDING": "Backup Funding"}
+        acct_by_id = {a.id: a for a in [acct_ramp, acct_citi, acct_hub, acct_saas, acct_reimb]}
         for rd in [
             {"rule_type": "BACKUP_FUNDING", "target_account_id": acct_citi.id,
              "source_account_id": acct_ramp.id, "time_of_day": "09:00:00",
@@ -493,6 +502,7 @@ def seed_demo_data(sim_name: str):
              "source_account_id": acct_saas.id, "time_of_day": "11:00:00",
              "currency": "USD", "threshold": 80000.0, "target_amount": 50000.0},
         ]:
+            rd["description"] = f"{acct_by_id[rd['source_account_id']].name} -> {acct_by_id[rd['target_account_id']].name} {type_labels[rd['rule_type']]}"
             session.add(FundingRule(**rd))
         session.flush()
 

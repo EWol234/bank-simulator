@@ -48,7 +48,7 @@ class ManualEntry(Propagator):
 
 
 class Topup(Propagator):
-    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency, threshold, target_amount):
+    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency, threshold, target_amount, description=""):
         self.rule_id = rule_id
         self.target_account_id = target_account_id
         self.source_account_id = source_account_id
@@ -56,7 +56,7 @@ class Topup(Propagator):
         self.timestamp = timestamp
         self.threshold = threshold
         self.target_amount = target_amount
-        self.description = f"{source_account_id} -> {target_account_id} Topup"
+        self.description = description
 
         self.funding_timestamp = timestamp + timedelta(minutes=30) # Hard-coding 30 mins for wires to land
 
@@ -103,7 +103,7 @@ class Topup(Propagator):
 
 
 class SweepOut(Propagator):
-    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency, threshold, target_amount):
+    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency, threshold, target_amount, description=""):
         self.rule_id = rule_id
         self.target_account_id = target_account_id
         self.source_account_id = source_account_id
@@ -111,7 +111,7 @@ class SweepOut(Propagator):
         self.timestamp = timestamp
         self.threshold = threshold
         self.target_amount = target_amount
-        self.description = f"{source_account_id} -> {target_account_id} Sweep Out"
+        self.description = description
 
         self.funding_timestamp = timestamp + timedelta(minutes=30)
 
@@ -188,6 +188,7 @@ class SimulationRunner:
                             currency=rule.currency,
                             threshold=rule.threshold,
                             target_amount=rule.target_amount,
+                            description=rule.description,
                         )
                     elif rule.rule_type == "SWEEP_OUT":
                         propagator = SweepOut(
@@ -198,6 +199,7 @@ class SimulationRunner:
                             currency=rule.currency,
                             threshold=rule.threshold,
                             target_amount=rule.target_amount,
+                            description=rule.description,
                         )
                     else:
                         continue

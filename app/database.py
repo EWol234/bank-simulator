@@ -96,6 +96,7 @@ class FundingRule(Base):
     currency = Column(String(16), nullable=False)
     threshold = Column(Float, nullable=False, default=0.0)
     target_amount = Column(Float, nullable=False, default=0.0)
+    description = Column(String(255), nullable=False, default="")
 
     target_account = relationship("Account", foreign_keys=[target_account_id])
     source_account = relationship("Account", foreign_keys=[source_account_id])
