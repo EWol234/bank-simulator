@@ -31,7 +31,7 @@ export default function SimulationList() {
   async function handleSeedDemo() {
     setError(null);
     try {
-      await seedDemoData('demo');
+      await seedDemoData();
       await load();
     } catch (e) {
       setError(e.message);

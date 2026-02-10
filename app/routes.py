@@ -454,10 +454,13 @@ def create_entry(sim_name: str, account_id: int):
 # ------------------------------------------------------------------
 
 
-@bp.route("/simulations/<sim_name>/seed", methods=["POST"])
-def seed_demo_data(sim_name: str):
-    if simulation_exists(sim_name):
-        delete_simulation(sim_name)
+@bp.route("/simulations/seed-demo", methods=["POST"])
+def seed_demo_data():
+    sim_name = "demo"
+    n = 1
+    while simulation_exists(sim_name):
+        sim_name = f"demo ({n})"
+        n += 1
     create_simulation(sim_name, start_date="2025-01-06T00:00:00", end_date="2025-01-10T23:59:59")
 
     with get_session(sim_name) as session:

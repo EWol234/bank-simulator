@@ -95,6 +95,6 @@ export function createEntry(simName, accountId, entry) {
   });
 }
 
-export function seedDemoData(simName) {
-  return request(`${BASE}/${simName}/seed`, { method: 'POST' });
+export function seedDemoData() {
+  return request(`${BASE}/seed-demo`, { method: 'POST' });
 }

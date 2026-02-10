@@ -76,8 +76,6 @@ class Topup(Propagator):
         if balance_diff == 0:
             return []
 
-        print(f"Target balance: {target_account_balance}, prior topup: {prior_topup_amount}, diff: {balance_diff}")
-
         source_balance_entry = BalanceEntry(
             account_id=self.source_account_id,
             amount=-balance_diff,
