@@ -137,29 +137,35 @@ export default function SimulationDetail() {
       </section>
 
       <section>
-        <h2>Backup Funding Rules</h2>
+        <h2>Funding Rules</h2>
         {accounts.length >= 2 ? (
           <FundingForm accounts={accounts} onSubmit={handleCreateRule} />
         ) : (
-          <p>Create at least 2 accounts to add backup funding rules.</p>
+          <p>Create at least 2 accounts to add funding rules.</p>
         )}
         {rules.length > 0 && (
           <table>
             <thead>
               <tr>
+                <th>Type</th>
                 <th>Target Account</th>
-                <th>Backup Account</th>
+                <th>Source Account</th>
                 <th>Time of Day (ET)</th>
                 <th>Currency</th>
+                <th>Threshold</th>
+                <th>Target Amount</th>
               </tr>
             </thead>
             <tbody>
               {rules.map((rule) => (
                 <tr key={rule.id}>
+                  <td>{rule.rule_type === 'TOPUP' ? 'Topup' : 'Backup Funding'}</td>
                   <td>{accounts.find((a) => a.id === rule.target_account_id)?.name || rule.target_account_id}</td>
                   <td>{accounts.find((a) => a.id === rule.source_account_id)?.name || rule.source_account_id}</td>
                   <td>{rule.time_of_day}</td>
                   <td>{rule.currency}</td>
+                  <td>{rule.rule_type === 'TOPUP' ? rule.threshold : '-'}</td>
+                  <td>{rule.rule_type === 'TOPUP' ? rule.target_amount : '-'}</td>
                 </tr>
               ))}
             </tbody>

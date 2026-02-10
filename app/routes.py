@@ -56,20 +56,26 @@ class MetadataUpdate(BaseModel):
 
 
 class FundingRuleCreate(BaseModel):
+    rule_type: str
     target_account_id: int
     source_account_id: int
     time_of_day: str
     currency: str = "USD"
+    threshold: float = 0.0
+    target_amount: float = 0.0
 
 
 class FundingRuleOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    rule_type: str
     target_account_id: int
     source_account_id: int
     time_of_day: str
     currency: str
+    threshold: float
+    target_amount: float
 
 
 class BalanceEntryCreate(BaseModel):
@@ -276,8 +282,18 @@ def create_funding_rule(sim_name: str):
     except ValueError:
         return jsonify({"error": "time_of_day must be in HH:MM:SS format"}), 422
 
+    if body.rule_type not in ("BACKUP_FUNDING", "TOPUP"):
+        return jsonify({"error": "rule_type must be BACKUP_FUNDING or TOPUP"}), 422
+
     if body.target_account_id == body.source_account_id:
         return jsonify({"error": "Target and source accounts must be different"}), 422
+
+    if body.rule_type == "BACKUP_FUNDING":
+        body.threshold = 0.0
+        body.target_amount = 0.0
+    elif body.rule_type == "TOPUP":
+        if body.target_amount < body.threshold:
+            return jsonify({"error": "target_amount must be >= threshold"}), 422
 
     ensure_tables(sim_name)
     with get_session(sim_name) as session:
@@ -288,10 +304,13 @@ def create_funding_rule(sim_name: str):
             return jsonify({"error": "Source account not found"}), 404
 
         rule = FundingRule(
+            rule_type=body.rule_type,
             target_account_id=body.target_account_id,
             source_account_id=body.source_account_id,
             time_of_day=body.time_of_day,
             currency=body.currency,
+            threshold=body.threshold,
+            target_amount=body.target_amount,
         )
         session.add(rule)
         session.flush()

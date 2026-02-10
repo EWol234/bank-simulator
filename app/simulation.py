@@ -48,14 +48,14 @@ class ManualEntry(Propagator):
 
 
 class Topup(Propagator):
-    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency, threshold, target):
+    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency, threshold, target_amount):
         self.rule_id = rule_id
         self.target_account_id = target_account_id
         self.source_account_id = source_account_id
         self.currency = currency
         self.timestamp = timestamp
         self.threshold = threshold
-        self.target = target
+        self.target_amount = target_amount
         self.description = f"{source_account_id} -> {target_account_id} Topup"
 
         self.funding_timestamp = timestamp + timedelta(minutes=30) # Hard-coding 30 mins for wires to land
@@ -71,7 +71,7 @@ class Topup(Propagator):
         if target_account_balance > self.threshold:
             balance_diff = -min(prior_topup_amount, target_account_balance - self.threshold)
         elif target_account_balance < self.threshold:
-            balance_diff = self.threshold - target_account_balance - prior_topup_amount
+            balance_diff = self.target_amount - target_account_balance - prior_topup_amount
 
         if balance_diff == 0:
             return []
@@ -102,19 +102,6 @@ class Topup(Propagator):
         return [source_balance_entry, target_balance_entry]
 
 
-class BackupAccount(Topup):
-    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency):
-        super().__init__(
-            rule_id,
-            target_account_id,
-            source_account_id,
-            timestamp,
-            currency,
-            0,
-            0,
-        )
-
-
 class SimulationRunner:
     def __init__(self, start_datetime, end_datetime, session):
         self.start_datetime = start_datetime
@@ -131,12 +118,14 @@ class SimulationRunner:
                 t = datetime.strptime(rule.time_of_day, "%H:%M:%S").time()
                 timestamp = datetime.combine(current_date, t)
                 if start_datetime <= timestamp <= end_datetime:
-                    propagator = BackupAccount(
+                    propagator = Topup(
+                        rule_id=rule.id,
                         target_account_id=rule.target_account_id,
                         source_account_id=rule.source_account_id,
                         timestamp=timestamp,
                         currency=rule.currency,
-                        rule_id=rule.id,
+                        threshold=rule.threshold,
+                        target_amount=rule.target_amount,
                     )
                     self.add_propagator(propagator)
 

@@ -89,10 +89,13 @@ class FundingRule(Base):
     __tablename__ = "funding_rules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    rule_type = Column(String(16), nullable=False)  # "BACKUP_FUNDING" or "TOPUP"
     target_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     source_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     time_of_day = Column(String(8), nullable=False)  # "HH:MM:SS" in ET
     currency = Column(String(16), nullable=False)
+    threshold = Column(Float, nullable=False, default=0.0)
+    target_amount = Column(Float, nullable=False, default=0.0)
 
     target_account = relationship("Account", foreign_keys=[target_account_id])
     source_account = relationship("Account", foreign_keys=[source_account_id])
