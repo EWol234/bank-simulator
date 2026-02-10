@@ -73,7 +73,7 @@ class Topup(Propagator):
         elif target_account_balance < self.threshold:
             balance_diff = self.target_amount - target_account_balance - prior_topup_amount
 
-        if balance_diff == 0:
+        if abs(balance_diff) < 1e-9:
             return []
 
         source_balance_entry = BalanceEntry(
@@ -118,10 +118,10 @@ class SweepOut(Propagator):
 
     def propagate(self, session):
         source_balance = get_balance(session, self.source_account_id, self.timestamp, self.currency)
+        # prior_sweep_amount is negative (debit entries on source) or zero
         prior_sweep_amount = get_balance_at_timestamp(
             session, self.source_account_id, self.funding_timestamp, self.currency, rule_id=self.rule_id
         )
-        # prior_sweep_amount is negative (debit entries on source) or zero
 
         balance_diff = 0
         if source_balance > self.threshold:
@@ -134,8 +134,6 @@ class SweepOut(Propagator):
 
         if abs(balance_diff) < 1e-9:
             return []
-
-        print(f"Source balance: {source_balance}, prior sweep: {prior_sweep_amount}, diff: {balance_diff}")
 
         source_balance_entry = BalanceEntry(
             account_id=self.source_account_id,
