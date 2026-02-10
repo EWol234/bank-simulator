@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import NamedTuple
 from abc import ABC, abstractmethod
 
-from app.database import BalanceEntry
+from app.database import BalanceEntry, get_balance
 
 
 class ListeningPoint(NamedTuple):
@@ -45,6 +45,61 @@ class ManualEntry(Propagator):
         session.flush()
 
         return [balance_entry]
+
+
+class Topup(Propagator):
+    def __init__(self, target_account_id, source_account_id, timestamp, currency, threshold, target):
+        self.target_account_id = target_account_id
+        self.source_account_id = source_account_id
+        self.currency = currency
+        self.timestamp = timestamp
+        self.threshold = threshold
+        self.target = target
+        self.description = f"{source_account_id} -> {target_account_id} Topup"
+
+    def listening_points(self):
+        return [ListeningPoint(account_id=self.target_account_id, timestamp=self.timestamp)]
+
+    def propagate(self, session):
+        target_balance = get_balance(session, self.target_account_id, self.timestamp, self.currency)
+        prior_topup_amount = get_balance(session, self.target_account_id, self.timestamp, self.currency, self.description)
+        new_topup_amount = 0
+        if target_balance < threshold:
+            new_topup_amount = threshold - target_balance
+        if target_balance > threshold and prior_topup_amount > 0:
+            new_topup_amount = -min(prior_topup_amount, target_balance - threshold)
+
+
+        source_balance_entry = BalanceEntry(
+            account_id=self.source_account_id,
+            amount=-new_topup_amount,
+            currency=self.currency,
+            description=self.description,
+            effective_time=self.timestamp,
+        )
+        target_balance_entry = BalanceEntry(
+            account_id=self.source_account_id,
+            amount=new_topup_amount,
+            currency=self.currency,
+            description=self.description,
+            effective_time=self.timestamp,
+        )
+        
+        session.add(source_balance_entry)
+        session.add(target_balance_entry)
+        session.flush()
+
+
+class BackupAccount(Topup):
+    def __init__(self, target_account_id, source_account_id, timestamp, currency):
+        super().__init__(
+            target_account_id,
+            source_account_id,
+            timestamp,
+            currency,
+            0,
+            0,
+        )
 
 
 class SimulationRunner:

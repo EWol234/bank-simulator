@@ -84,6 +84,21 @@ class BalanceEntry(Base):
         )
 
 
+def get_balance(session, account_id, timestamp, currency, description=None):
+    """Return the sum of all balance entries for an account/currency at or before a timestamp."""
+    from sqlalchemy import func
+    filters = [
+        BalanceEntry.account_id == account_id,
+        BalanceEntry.currency == currency,
+        BalanceEntry.effective_time <= timestamp,
+    ]
+    if description is not None:
+        filters.append(BalanceEntry.description == description)
+
+    result = session.query(func.coalesce(func.sum(BalanceEntry.amount), 0.0)).filter(*filters).scalar()
+    return result
+
+
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
