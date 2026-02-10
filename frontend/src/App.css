@@ -126,3 +126,44 @@ td.number {
 section {
   margin-bottom: 2rem;
 }
+
+/* Activity Timeline */
+
+.activity-timeline .day-header {
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid #2563eb;
+  color: #1e3a5f;
+}
+
+.activity-timeline .activity-account h4 {
+  margin: 0.5rem 0 0.25rem;
+  color: #374151;
+}
+
+.activity-timeline .eod-balances {
+  margin: 0.5rem 0 1rem;
+  padding: 0.5rem 0.75rem;
+  background: #f0f4ff;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.activity-timeline .eod-item {
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-timeline .final-summary {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.activity-timeline .final-summary h3 {
+  margin: 0 0 0.75rem;
+}

@@ -63,6 +63,10 @@ export function deleteAccount(simName, accountId) {
   });
 }
 
+export function listActivity(simName) {
+  return request(`${BASE}/${simName}/activity`);
+}
+
 export function listEntries(simName, accountId) {
   return request(`${BASE}/${simName}/accounts/${accountId}/entries`);
 }

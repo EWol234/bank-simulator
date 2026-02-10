@@ -233,6 +233,32 @@ def delete_account(sim_name: str, account_id: int):
 # ------------------------------------------------------------------
 
 
+@bp.route("/simulations/<sim_name>/activity", methods=["GET"])
+def list_activity(sim_name: str):
+    err = _ensure_sim(sim_name)
+    if err:
+        return err
+    with get_session(sim_name) as session:
+        rows = (
+            session.query(BalanceEntry, Account.name)
+            .join(Account, BalanceEntry.account_id == Account.id)
+            .order_by(BalanceEntry.effective_time, BalanceEntry.account_id, BalanceEntry.id)
+            .all()
+        )
+        result = []
+        for entry, account_name in rows:
+            result.append({
+                "id": entry.id,
+                "account_id": entry.account_id,
+                "account_name": account_name,
+                "amount": entry.amount,
+                "currency": entry.currency,
+                "description": entry.description,
+                "effective_time": entry.effective_time.isoformat(),
+            })
+        return jsonify(result)
+
+
 @bp.route("/simulations/<sim_name>/accounts/<int:account_id>/entries", methods=["GET"])
 def list_entries(sim_name: str, account_id: int):
     err = _ensure_sim(sim_name)

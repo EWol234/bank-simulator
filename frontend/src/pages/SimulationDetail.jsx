@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getMetadata, updateMetadata, listAccounts, createAccount, deleteAccount } from '../api';
+import { getMetadata, updateMetadata, listAccounts, createAccount, deleteAccount, listActivity } from '../api';
 import AccountForm from '../components/AccountForm';
+import ActivityTimeline from '../components/ActivityTimeline';
 
 export default function SimulationDetail() {
   const { simName } = useParams();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [accounts, setAccounts] = useState([]);
+  const [activity, setActivity] = useState([]);
   const [error, setError] = useState(null);
 
   async function loadMetadata() {
@@ -29,9 +31,19 @@ export default function SimulationDetail() {
     }
   }
 
+  async function loadActivity() {
+    try {
+      const data = await listActivity(simName);
+      setActivity(data);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   useEffect(() => {
     loadMetadata();
     loadAccounts();
+    loadActivity();
   }, [simName]);
 
   async function handleMetadataSave(e) {
@@ -100,6 +112,13 @@ export default function SimulationDetail() {
           {accounts.length === 0 && <li>No accounts yet.</li>}
         </ul>
       </section>
+
+      {activity.length > 0 && (
+        <section>
+          <h2>Activity Timeline</h2>
+          <ActivityTimeline entries={activity} />
+        </section>
+      )}
     </>
   );
 }
