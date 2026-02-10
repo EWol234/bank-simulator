@@ -461,7 +461,7 @@ def seed_demo_data():
     while simulation_exists(sim_name):
         sim_name = f"demo ({n})"
         n += 1
-    create_simulation(sim_name, start_date="2025-01-06T00:00:00", end_date="2025-01-10T23:59:59")
+    create_simulation(sim_name, start_date="2026-01-06T00:00:00", end_date="2026-01-10T23:59:59")
 
     with get_session(sim_name) as session:
         # Create accounts
@@ -473,8 +473,8 @@ def seed_demo_data():
         session.add_all([acct_ramp, acct_citi, acct_hub, acct_saas, acct_reimb])
         session.flush()
 
-        # Initial balances at 2025-01-06 00:00
-        initial_time = datetime(2025, 1, 6, 0, 0, 0)
+        # Initial balances at 2026-01-06 00:00
+        initial_time = datetime(2026, 1, 6, 0, 0, 0)
         for acct_id, amount, desc in [
             (acct_ramp.id, 500000.0, "Initial balance"),
             (acct_citi.id, 50000.0, "Initial balance"),
@@ -511,12 +511,12 @@ def seed_demo_data():
 
         # Simulated activity
         for acct_id, amount, eff_time, desc in [
-            (acct_citi.id, -60000.0, datetime(2025, 1, 7, 8, 0, 0), "Wire payment - vendor"),
-            (acct_reimb.id, -28000.0, datetime(2025, 1, 7, 8, 0, 0), "Reimbursement payout"),
-            (acct_saas.id, 50000.0, datetime(2025, 1, 8, 7, 0, 0), "SaaS revenue deposit"),
-            (acct_citi.id, -30000.0, datetime(2025, 1, 9, 8, 0, 0), "Wire payment - rent"),
-            (acct_reimb.id, -20000.0, datetime(2025, 1, 9, 8, 0, 0), "Reimbursement batch"),
-            (acct_saas.id, 40000.0, datetime(2025, 1, 10, 7, 0, 0), "SaaS revenue deposit"),
+            (acct_citi.id, -60000.0, datetime(2026, 1, 7, 8, 0, 0), "Wire payment - vendor"),
+            (acct_reimb.id, -28000.0, datetime(2026, 1, 7, 8, 0, 0), "Reimbursement payout"),
+            (acct_saas.id, 50000.0, datetime(2026, 1, 8, 7, 0, 0), "SaaS revenue deposit"),
+            (acct_citi.id, -30000.0, datetime(2026, 1, 9, 8, 0, 0), "Wire payment - rent"),
+            (acct_reimb.id, -20000.0, datetime(2026, 1, 9, 8, 0, 0), "Reimbursement batch"),
+            (acct_saas.id, 40000.0, datetime(2026, 1, 10, 7, 0, 0), "SaaS revenue deposit"),
         ]:
             session.add(BalanceEntry(
                 account_id=acct_id, amount=amount, currency="USD",
