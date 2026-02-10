@@ -69,7 +69,7 @@ class Topup(Propagator):
 
         balance_diff = 0
         if target_account_balance > self.threshold:
-            balance_diff = -min(prior_topup_amount, target_account_balance - self.threshold)
+            balance_diff = -prior_topup_amount
         elif target_account_balance < self.threshold:
             balance_diff = self.target_amount - target_account_balance - prior_topup_amount
 
@@ -128,9 +128,8 @@ class SweepOut(Propagator):
             # Sweep excess: bring source down to target_amount
             # prior_sweep_amount is negative, so adding it subtracts already-swept amount
             balance_diff = -(source_balance - self.target_amount + prior_sweep_amount)
-        elif source_balance < self.threshold and prior_sweep_amount < 0:
-            # Reversal: source dropped below threshold, undo some prior sweep
-            balance_diff = min(-prior_sweep_amount, self.threshold - source_balance)
+        elif source_balance < self.threshold:
+            balance_diff = -prior_sweep_amount
 
         if abs(balance_diff) < 1e-9:
             return []

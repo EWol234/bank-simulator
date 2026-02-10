@@ -493,10 +493,10 @@ def seed_demo_data():
         acct_by_id = {a.id: a for a in [acct_ramp, acct_citi, acct_hub, acct_saas, acct_reimb]}
         for rd in [
             {"rule_type": "BACKUP_FUNDING", "target_account_id": acct_citi.id,
-             "source_account_id": acct_ramp.id, "time_of_day": "09:00:00",
+             "source_account_id": acct_ramp.id, "time_of_day": "17:00:00",
              "currency": "USD", "threshold": 0.0, "target_amount": 0.0},
             {"rule_type": "BACKUP_FUNDING", "target_account_id": acct_hub.id,
-             "source_account_id": acct_ramp.id, "time_of_day": "09:00:00",
+             "source_account_id": acct_ramp.id, "time_of_day": "17:00:00",
              "currency": "USD", "threshold": 0.0, "target_amount": 0.0},
             {"rule_type": "TOPUP", "target_account_id": acct_reimb.id,
              "source_account_id": acct_hub.id, "time_of_day": "10:00:00",
@@ -512,7 +512,7 @@ def seed_demo_data():
         # Simulated activity
         for acct_id, amount, eff_time, desc in [
             (acct_citi.id, -60000.0, datetime(2025, 1, 7, 8, 0, 0), "Wire payment - vendor"),
-            (acct_reimb.id, -18000.0, datetime(2025, 1, 7, 8, 0, 0), "Reimbursement payout"),
+            (acct_reimb.id, -28000.0, datetime(2025, 1, 7, 8, 0, 0), "Reimbursement payout"),
             (acct_saas.id, 50000.0, datetime(2025, 1, 8, 7, 0, 0), "SaaS revenue deposit"),
             (acct_citi.id, -30000.0, datetime(2025, 1, 9, 8, 0, 0), "Wire payment - rent"),
             (acct_reimb.id, -20000.0, datetime(2025, 1, 9, 8, 0, 0), "Reimbursement batch"),
