@@ -35,7 +35,7 @@ export default function EntryForm({ onSubmit }) {
         <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
       </div>
       <div className="field">
-        <label>Effective Time</label>
+        <label>Effective Time (ET)</label>
         <input type="datetime-local" value={effectiveTime} onChange={(e) => setEffectiveTime(e.target.value)} required />
       </div>
       <button type="submit">Add Entry</button>

@@ -1,36 +1,4 @@
-const NY_DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/New_York',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-const NY_DISPLAY_FORMAT = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/New_York',
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-});
-
-const NY_TIME_FORMAT = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/New_York',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hour12: true,
-});
-
-function toNYDateKey(isoString) {
-  return NY_DATE_FORMAT.format(new Date(isoString));
-}
-
-function toNYDisplay(isoString) {
-  return NY_DISPLAY_FORMAT.format(new Date(isoString));
-}
-
-function toNYTime(isoString) {
-  return NY_TIME_FORMAT.format(new Date(isoString));
-}
+import { toNYDateKey, toNYDisplay, toNYTime } from '../dateUtils';
 
 function formatAmount(amount) {
   return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -120,7 +88,7 @@ export default function ActivityTimeline({ entries }) {
                   <table>
                     <thead>
                       <tr>
-                        <th>Time</th>
+                        <th>Time (ET)</th>
                         <th>Description</th>
                         <th>Currency</th>
                         <th className="number">Amount</th>

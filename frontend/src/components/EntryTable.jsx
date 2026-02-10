@@ -1,3 +1,5 @@
+import { toNYDateTime } from '../dateUtils';
+
 export default function EntryTable({ entries }) {
   if (entries.length === 0) {
     return <p>No entries yet.</p>;
@@ -22,7 +24,7 @@ export default function EntryTable({ entries }) {
     <table>
       <thead>
         <tr>
-          <th>Effective Time</th>
+          <th>Effective Time (ET)</th>
           <th>Description</th>
           <th>Currency</th>
           <th style={{ textAlign: 'right' }}>Amount</th>
@@ -34,7 +36,7 @@ export default function EntryTable({ entries }) {
           runningTotal += entry.amount;
           return (
             <tr key={i}>
-              <td>{new Date(entry.effective_time).toLocaleString()}</td>
+              <td>{toNYDateTime(entry.effective_time)}</td>
               <td>{entry.description || '\u2014'}</td>
               <td>{entry.currency}</td>
               <td className="number">{entry.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
