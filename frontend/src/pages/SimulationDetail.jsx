@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getMetadata, updateMetadata, listAccounts, createAccount, deleteAccount, listActivity, listFundingRules, createFundingRule } from '../api';
+import { getMetadata, updateMetadata, listAccounts, createAccount, deleteAccount, listActivity, listFundingRules, createFundingRule, deleteFundingRule } from '../api';
 import AccountForm from '../components/AccountForm';
 import FundingForm from '../components/FundingForm';
 import ActivityTimeline from '../components/ActivityTimeline';
@@ -88,6 +88,17 @@ export default function SimulationDetail() {
     }
   }
 
+  async function handleDeleteRule(ruleId) {
+    setError(null);
+    try {
+      await deleteFundingRule(simName, ruleId);
+      await loadRules();
+      await loadActivity();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function handleCreateRule(rule) {
     setError(null);
     try {
@@ -154,18 +165,20 @@ export default function SimulationDetail() {
                 <th>Currency</th>
                 <th>Threshold</th>
                 <th>Target Amount</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {rules.map((rule) => (
                 <tr key={rule.id}>
-                  <td>{rule.rule_type === 'TOPUP' ? 'Topup' : 'Backup Funding'}</td>
+                  <td>{rule.rule_type === 'TOPUP' ? 'Topup' : rule.rule_type === 'SWEEP_OUT' ? 'Sweep Out' : 'Backup Funding'}</td>
                   <td>{accounts.find((a) => a.id === rule.target_account_id)?.name || rule.target_account_id}</td>
                   <td>{accounts.find((a) => a.id === rule.source_account_id)?.name || rule.source_account_id}</td>
                   <td>{rule.time_of_day}</td>
                   <td>{rule.currency}</td>
-                  <td>{rule.rule_type === 'TOPUP' ? rule.threshold : '-'}</td>
-                  <td>{rule.rule_type === 'TOPUP' ? rule.target_amount : '-'}</td>
+                  <td>{(rule.rule_type === 'TOPUP' || rule.rule_type === 'SWEEP_OUT') ? rule.threshold : '-'}</td>
+                  <td>{(rule.rule_type === 'TOPUP' || rule.rule_type === 'SWEEP_OUT') ? rule.target_amount : '-'}</td>
+                  <td><button className="danger" onClick={() => handleDeleteRule(rule.id)}>Delete</button></td>
                 </tr>
               ))}
             </tbody>

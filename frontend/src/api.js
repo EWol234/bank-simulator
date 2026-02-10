@@ -78,6 +78,12 @@ export function createFundingRule(simName, rule) {
   });
 }
 
+export function deleteFundingRule(simName, ruleId) {
+  return request(`${BASE}/${simName}/funding-rules/${ruleId}`, {
+    method: 'DELETE',
+  });
+}
+
 export function listEntries(simName, accountId) {
   return request(`${BASE}/${simName}/accounts/${accountId}/entries`);
 }
@@ -87,4 +93,8 @@ export function createEntry(simName, accountId, entry) {
     method: 'POST',
     body: JSON.stringify(entry),
   });
+}
+
+export function seedDemoData(simName) {
+  return request(`${BASE}/${simName}/seed`, { method: 'POST' });
 }

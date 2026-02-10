@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listSimulations, createSimulation, deleteSimulation } from '../api';
+import { listSimulations, createSimulation, deleteSimulation, seedDemoData } from '../api';
 import SimulationForm from '../components/SimulationForm';
 
 export default function SimulationList() {
@@ -28,6 +28,16 @@ export default function SimulationList() {
     }
   }
 
+  async function handleSeedDemo() {
+    setError(null);
+    try {
+      await seedDemoData('demo');
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function handleDelete(name) {
     setError(null);
     try {
@@ -43,6 +53,7 @@ export default function SimulationList() {
       <h1>Simulations</h1>
       {error && <div className="error">{error}</div>}
       <SimulationForm onSubmit={handleCreate} />
+      <button onClick={handleSeedDemo} style={{ marginBottom: '1rem' }}>Seed Demo</button>
       <ul>
         {simulations.map((name) => (
           <li key={name}>

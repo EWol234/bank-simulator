@@ -102,6 +102,67 @@ class Topup(Propagator):
         return [source_balance_entry, target_balance_entry]
 
 
+class SweepOut(Propagator):
+    def __init__(self, rule_id, target_account_id, source_account_id, timestamp, currency, threshold, target_amount):
+        self.rule_id = rule_id
+        self.target_account_id = target_account_id
+        self.source_account_id = source_account_id
+        self.currency = currency
+        self.timestamp = timestamp
+        self.threshold = threshold
+        self.target_amount = target_amount
+        self.description = f"{source_account_id} -> {target_account_id} Sweep Out"
+
+        self.funding_timestamp = timestamp + timedelta(minutes=30)
+
+    def listening_points(self):
+        return [ListeningPoint(account_id=self.source_account_id, timestamp=self.timestamp)]
+
+    def propagate(self, session):
+        source_balance = get_balance(session, self.source_account_id, self.timestamp, self.currency)
+        prior_sweep_amount = get_balance_at_timestamp(
+            session, self.source_account_id, self.funding_timestamp, self.currency, rule_id=self.rule_id
+        )
+        # prior_sweep_amount is negative (debit entries on source) or zero
+
+        balance_diff = 0
+        if source_balance > self.threshold:
+            # Sweep excess: bring source down to target_amount
+            # prior_sweep_amount is negative, so adding it subtracts already-swept amount
+            balance_diff = -(source_balance - self.target_amount + prior_sweep_amount)
+        elif source_balance < self.threshold and prior_sweep_amount < 0:
+            # Reversal: source dropped below threshold, undo some prior sweep
+            balance_diff = min(-prior_sweep_amount, self.threshold - source_balance)
+
+        if abs(balance_diff) < 1e-9:
+            return []
+
+        print(f"Source balance: {source_balance}, prior sweep: {prior_sweep_amount}, diff: {balance_diff}")
+
+        source_balance_entry = BalanceEntry(
+            account_id=self.source_account_id,
+            amount=balance_diff,
+            currency=self.currency,
+            description=self.description,
+            effective_time=self.funding_timestamp,
+            rule_id=self.rule_id,
+        )
+        target_balance_entry = BalanceEntry(
+            account_id=self.target_account_id,
+            amount=-balance_diff,
+            currency=self.currency,
+            description=self.description,
+            effective_time=self.funding_timestamp,
+            rule_id=self.rule_id,
+        )
+
+        session.add(source_balance_entry)
+        session.add(target_balance_entry)
+        session.flush()
+
+        return [source_balance_entry, target_balance_entry]
+
+
 class SimulationRunner:
     def __init__(self, start_datetime, end_datetime, session):
         self.start_datetime = start_datetime
@@ -118,15 +179,28 @@ class SimulationRunner:
                 t = datetime.strptime(rule.time_of_day, "%H:%M:%S").time()
                 timestamp = datetime.combine(current_date, t)
                 if start_datetime <= timestamp <= end_datetime:
-                    propagator = Topup(
-                        rule_id=rule.id,
-                        target_account_id=rule.target_account_id,
-                        source_account_id=rule.source_account_id,
-                        timestamp=timestamp,
-                        currency=rule.currency,
-                        threshold=rule.threshold,
-                        target_amount=rule.target_amount,
-                    )
+                    if rule.rule_type in ("TOPUP", "BACKUP_FUNDING"):
+                        propagator = Topup(
+                            rule_id=rule.id,
+                            target_account_id=rule.target_account_id,
+                            source_account_id=rule.source_account_id,
+                            timestamp=timestamp,
+                            currency=rule.currency,
+                            threshold=rule.threshold,
+                            target_amount=rule.target_amount,
+                        )
+                    elif rule.rule_type == "SWEEP_OUT":
+                        propagator = SweepOut(
+                            rule_id=rule.id,
+                            target_account_id=rule.target_account_id,
+                            source_account_id=rule.source_account_id,
+                            timestamp=timestamp,
+                            currency=rule.currency,
+                            threshold=rule.threshold,
+                            target_amount=rule.target_amount,
+                        )
+                    else:
+                        continue
                     self.add_propagator(propagator)
 
             current_date += timedelta(days=1)

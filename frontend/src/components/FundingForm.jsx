@@ -12,7 +12,7 @@ export default function FundingForm({ accounts, onSubmit }) {
   function handleSubmit(e) {
     e.preventDefault();
     if (!targetAccountId || !sourceAccountId || !timeOfDay) return;
-    if (ruleType === 'TOPUP' && (!threshold || !targetAmount)) return;
+    if ((ruleType === 'TOPUP' || ruleType === 'SWEEP_OUT') && (!threshold || !targetAmount)) return;
     const rule = {
       rule_type: ruleType,
       target_account_id: parseInt(targetAccountId),
@@ -20,7 +20,7 @@ export default function FundingForm({ accounts, onSubmit }) {
       time_of_day: timeOfDay.length === 5 ? timeOfDay + ':00' : timeOfDay,
       currency,
     };
-    if (ruleType === 'TOPUP') {
+    if (ruleType === 'TOPUP' || ruleType === 'SWEEP_OUT') {
       rule.threshold = parseFloat(threshold);
       rule.target_amount = parseFloat(targetAmount);
     }
@@ -41,6 +41,7 @@ export default function FundingForm({ accounts, onSubmit }) {
         <select value={ruleType} onChange={(e) => setRuleType(e.target.value)} required>
           <option value="BACKUP_FUNDING">Backup Funding</option>
           <option value="TOPUP">Topup</option>
+          <option value="SWEEP_OUT">Sweep Out</option>
         </select>
       </div>
       <div className="field">
@@ -69,7 +70,7 @@ export default function FundingForm({ accounts, onSubmit }) {
         <label>Currency</label>
         <input value={currency} onChange={(e) => setCurrency(e.target.value)} required />
       </div>
-      {ruleType === 'TOPUP' && (
+      {(ruleType === 'TOPUP' || ruleType === 'SWEEP_OUT') && (
         <>
           <div className="field">
             <label>Threshold</label>

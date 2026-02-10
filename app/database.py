@@ -89,7 +89,7 @@ class FundingRule(Base):
     __tablename__ = "funding_rules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    rule_type = Column(String(16), nullable=False)  # "BACKUP_FUNDING" or "TOPUP"
+    rule_type = Column(String(16), nullable=False)  # "BACKUP_FUNDING", "TOPUP", or "SWEEP_OUT"
     target_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     source_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     time_of_day = Column(String(8), nullable=False)  # "HH:MM:SS" in ET
