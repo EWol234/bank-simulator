@@ -7,12 +7,15 @@ from pydantic import BaseModel, ConfigDict
 
 from app.database import (
     Account,
+    BalanceEntry,
+    SimulationMetadata,
     create_simulation,
     delete_simulation,
     get_session,
     list_simulations,
     simulation_exists,
 )
+from app.simulation import ManualEntry, SimulationRunner
 
 # ------------------------------------------------------------------
 # Schemas
@@ -21,6 +24,8 @@ from app.database import (
 
 class SimulationCreate(BaseModel):
     name: str
+    start_date: str | None = None
+    end_date: str | None = None
 
 
 class SimulationList(BaseModel):
@@ -41,6 +46,29 @@ class AccountOut(BaseModel):
     id: int
     name: str
     created_at: datetime
+
+
+class MetadataUpdate(BaseModel):
+    start_date: str | None = None
+    end_date: str | None = None
+
+
+class BalanceEntryCreate(BaseModel):
+    amount: float
+    currency: str
+    description: str | None = None
+    effective_time: str
+
+
+class BalanceEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    account_id: int
+    amount: float
+    currency: str
+    description: str | None
+    effective_time: datetime
 
 
 # ------------------------------------------------------------------
@@ -72,7 +100,7 @@ def create_simulation_route():
     body = SimulationCreate.model_validate(request.get_json())
     if simulation_exists(body.name):
         return jsonify({"error": f"Simulation '{body.name}' already exists"}), 409
-    create_simulation(body.name)
+    create_simulation(body.name, start_date=body.start_date, end_date=body.end_date)
     return jsonify({"name": body.name, "message": "created"}), 201
 
 
@@ -82,6 +110,52 @@ def delete_simulation_route(sim_name: str):
         return jsonify({"error": "not found"}), 404
     delete_simulation(sim_name)
     return jsonify({"name": sim_name, "message": "deleted"})
+
+
+# ------------------------------------------------------------------
+# Simulation metadata
+# ------------------------------------------------------------------
+
+
+@bp.route("/simulations/<sim_name>/metadata", methods=["GET"])
+def get_metadata(sim_name: str):
+    err = _ensure_sim(sim_name)
+    if err:
+        return err
+    with get_session(sim_name) as session:
+        meta = session.query(SimulationMetadata).first()
+        if not meta:
+            return jsonify({"start_date": None, "end_date": None})
+        return jsonify({
+            "start_date": meta.start_datetime.isoformat(),
+            "end_date": meta.end_datetime.isoformat(),
+        })
+
+
+@bp.route("/simulations/<sim_name>/metadata", methods=["PATCH"])
+def update_metadata(sim_name: str):
+    err = _ensure_sim(sim_name)
+    if err:
+        return err
+    body = MetadataUpdate.model_validate(request.get_json())
+    with get_session(sim_name) as session:
+        meta = session.query(SimulationMetadata).first()
+        if not meta:
+            meta = SimulationMetadata(
+                start_datetime=datetime.fromisoformat(body.start_date) if body.start_date else datetime.utcnow(),
+                end_datetime=datetime.fromisoformat(body.end_date) if body.end_date else datetime.utcnow(),
+            )
+            session.add(meta)
+        else:
+            if body.start_date is not None:
+                meta.start_datetime = datetime.fromisoformat(body.start_date)
+            if body.end_date is not None:
+                meta.end_datetime = datetime.fromisoformat(body.end_date)
+        session.flush()
+        return jsonify({
+            "start_date": meta.start_datetime.isoformat(),
+            "end_date": meta.end_datetime.isoformat(),
+        })
 
 
 # ------------------------------------------------------------------
@@ -152,3 +226,64 @@ def delete_account(sim_name: str, account_id: int):
             return jsonify({"error": "account not found"}), 404
         session.delete(acct)
     return jsonify({"message": "deleted"})
+
+
+# ------------------------------------------------------------------
+# Balance entries
+# ------------------------------------------------------------------
+
+
+@bp.route("/simulations/<sim_name>/accounts/<int:account_id>/entries", methods=["GET"])
+def list_entries(sim_name: str, account_id: int):
+    err = _ensure_sim(sim_name)
+    if err:
+        return err
+    with get_session(sim_name) as session:
+        acct = session.get(Account, account_id)
+        if not acct:
+            return jsonify({"error": "account not found"}), 404
+        entries = (
+            session.query(BalanceEntry)
+            .filter_by(account_id=account_id)
+            .order_by(BalanceEntry.effective_time, BalanceEntry.id)
+            .all()
+        )
+        return jsonify([BalanceEntryOut.model_validate(e).model_dump(mode="json") for e in entries])
+
+
+@bp.route("/simulations/<sim_name>/accounts/<int:account_id>/entries", methods=["POST"])
+def create_entry(sim_name: str, account_id: int):
+    err = _ensure_sim(sim_name)
+    if err:
+        return err
+    body = BalanceEntryCreate.model_validate(request.get_json())
+    with get_session(sim_name) as session:
+        acct = session.get(Account, account_id)
+        if not acct:
+            return jsonify({"error": "account not found"}), 404
+
+        # Get simulation metadata for the runner
+        meta = session.query(SimulationMetadata).first()
+        start_dt = meta.start_datetime if meta else datetime.utcnow()
+        end_dt = meta.end_datetime if meta else datetime.utcnow()
+
+        propagator = ManualEntry(
+            account_id=account_id,
+            amount=body.amount,
+            currency=body.currency,
+            timestamp=datetime.fromisoformat(body.effective_time),
+            description=body.description or "Manual entry",
+        )
+
+        runner = SimulationRunner(start_dt, end_dt)
+        runner.add_propagator(propagator)
+        runner.simulate(session)
+
+        # Return updated entry list
+        entries = (
+            session.query(BalanceEntry)
+            .filter_by(account_id=account_id)
+            .order_by(BalanceEntry.effective_time, BalanceEntry.id)
+            .all()
+        )
+        return jsonify([BalanceEntryOut.model_validate(e).model_dump(mode="json") for e in entries]), 201

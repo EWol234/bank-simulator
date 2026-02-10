@@ -26,4 +26,22 @@ def create_app(data_dir: str | None = None) -> Flask:
     def handle_validation_error(exc: ValidationError):
         return jsonify({"error": "validation_error", "details": exc.errors()}), 422
 
+    @application.before_request
+    def handle_options():
+        from flask import request
+        if request.method == "OPTIONS":
+            from flask import make_response
+            resp = make_response("", 204)
+            resp.headers["Access-Control-Allow-Origin"] = "*"
+            resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+            resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+            return resp
+
+    @application.after_request
+    def add_cors_headers(response):
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+
     return application

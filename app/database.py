@@ -116,10 +116,24 @@ def get_session(sim_name: str):
         engine.dispose()
 
 
-def create_simulation(sim_name: str) -> None:
-    """Create a new SQLite file with all tables."""
+def create_simulation(sim_name: str, start_date: str | None = None, end_date: str | None = None) -> None:
+    """Create a new SQLite file with all tables, optionally with date range metadata."""
     engine = _make_engine(sim_name)
     Base.metadata.create_all(engine)
+    if start_date or end_date:
+        session: Session = sessionmaker(bind=engine)()
+        try:
+            meta = SimulationMetadata(
+                start_datetime=datetime.fromisoformat(start_date) if start_date else datetime.now(timezone.utc),
+                end_datetime=datetime.fromisoformat(end_date) if end_date else datetime.now(timezone.utc),
+            )
+            session.add(meta)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
     engine.dispose()
 
 
